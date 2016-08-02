@@ -1,5 +1,10 @@
-// VEML7700 arduino driver
+// VEML7700.cpp: VEML7700 Ambient light sensor arduino driver
+//
 // Copyright 2016 Theodore C. Yapo
+//
+// released under MIT License (see file)
+
+#include <VEML7700.h>
 
 VEML7700::
 VEML7700()
@@ -10,23 +15,29 @@ void
 VEML7700::
 begin()
 {
-  setPower(1);
-  delay(3);
+  Wire.begin();
+
   // write initial state to VEML7700
-  register_cache[0] = 0x0000;
+  register_cache[0] = ( (uint16_t(ALS_GAIN_x2) << ALS_SM_SHIFT) |
+                        (uint16_t(ALS_INTEGRATION_100ms) << ALS_IT_SHIFT) |
+                        (uint16_t(ALS_PERSISTENCE_1) << ALS_PERS_SHIFT) |
+                        (uint16_t(0) << ALS_INT_EN_SHIFT) |
+                        (uint16_t(0) << ALS_SD_SHIFT) );
   register_cache[1] = 0x0000;
-  register_cache[2] = 0x0000;
-  register_cache[3] = 0x0000;
-  register_cache[4] = 0x0000;
-  register_cache[5] = 0x0000;
-  for (uint8_t i=0; i<6; i++){
-    sendData(i, regsiter_cache[i]);
+  register_cache[2] = 0xffff;
+  register_cache[3] = ( (uint16_t(ALS_POWER_MODE_3) << PSM_SHIFT) |
+                        (uint16_t(0) << PSM_EN_SHIFT) );
+  for (uint8_t i=0; i<4; i++){
+    sendData(i, register_cache[i]);
   }
+
+  // wait at least 2.5ms as per datasheet
+  delay(3);
 }
 
 uint8_t
 VEML7700::
-sendData(uint8_t command, uint16_t data);
+sendData(uint8_t command, uint16_t data)
 {
   Wire.beginTransmission(I2C_ADDRESS);
   if (Wire.write(command) != 1){
@@ -52,10 +63,10 @@ receiveData(uint8_t command, uint16_t& data)
   if (Wire.write(command) != 1){
     return STATUS_ERROR;
   }
-  if (Wire.endTransmission()){
+  if (Wire.endTransmission(false)){  // NB: don't send stop here
     return STATUS_ERROR;
   }
-  if (Wire.requestFrom(I2C_ADDRESS, uint8_t(2)) != 2){
+  if (Wire.requestFrom(uint8_t(I2C_ADDRESS), uint8_t(2)) != 2){
     return STATUS_ERROR;
   }
   data = Wire.read();
@@ -65,19 +76,20 @@ receiveData(uint8_t command, uint16_t& data)
 
 uint8_t
 VEML7700::
-setGain(als_sens_t gain)
+setGain(als_gain_t gain)
 {
   uint16_t reg = ( (register_cache[COMMAND_ALS_SM] & ~ALS_SM_MASK) | 
-                   ((uint16_t(sens) << ALS_SM_SHIFT) & ALS_SM_MASK) );
+                   ((uint16_t(gain) << ALS_SM_SHIFT) & ALS_SM_MASK) );
   register_cache[COMMAND_ALS_SM] = reg;
   return sendData(COMMAND_ALS_SM, reg);
 }
 
 uint8_t
 VEML7700::
-getGain(als_sens_t& gain)
+getGain(als_gain_t& gain)
 {
-  gain = (register_cache[COMMAND_ALS_SM] & ~ALS_SM_MASK) >> ALS_SM_SHIFT;
+  gain = als_gain_t(
+    (register_cache[COMMAND_ALS_SM] & ~ALS_SM_MASK) >> ALS_SM_SHIFT );
   return STATUS_OK;
 }
 
@@ -95,7 +107,8 @@ uint8_t
 VEML7700::
 getIntegrationTime(als_itime_t& itime)
 {
-  itime = (register_cache[COMMAND_ALS_IT] & ~ALS_IT_MASK) >> ALS_IT_SHIFT;
+  itime = als_itime_t(
+    (register_cache[COMMAND_ALS_IT] & ~ALS_IT_MASK) >> ALS_IT_SHIFT );
   return STATUS_OK;
 }
 
@@ -133,10 +146,11 @@ uint8_t
 VEML7700::
 setInterrupts(uint8_t enabled)
 {
-  uint16_t reg = ( (register_cache[COMMAND_INT_EN] & ~PSM_INT_MASK) | 
-                   ((uint16_t(enabled) << PSM_INT_SHIFT) & PSM_INT_MASK) );
-  register_cache[COMMAND_INT_EN] = reg;
-  return sendData(COMMAND_INT_EN, reg);
+  uint16_t reg = ( (register_cache[COMMAND_ALS_INT_EN] & ~ALS_INT_EN_MASK) | 
+                   ((uint16_t(enabled) << ALS_INT_EN_SHIFT) & 
+                    ALS_INT_EN_MASK) );
+  register_cache[COMMAND_ALS_INT_EN] = reg;
+  return sendData(COMMAND_ALS_INT_EN, reg);
 }
 
 uint8_t
@@ -144,7 +158,7 @@ VEML7700::
 setPower(uint8_t on)
 {
   uint16_t reg = ( (register_cache[COMMAND_ALS_SD] & ~ALS_SD_MASK) | 
-                   ((uint16_t(on) << ALS_SD_SHIFT) & ALS_SD_MASK) );
+                   ((uint16_t(~on) << ALS_SD_SHIFT) & ALS_SD_MASK) );
   register_cache[COMMAND_ALS_SD] = reg;
   return sendData(COMMAND_ALS_SD, reg);
 }
@@ -167,14 +181,14 @@ uint8_t
 VEML7700::
 getALS(uint16_t& als)
 {
-  return readData(COMMAND_ALS, als);
+  return receiveData(COMMAND_ALS, als);
 }
 
 uint8_t
 VEML7700::
 getWhite(uint16_t& white)
 {
-  return readData(COMMAND_WHITE, white);
+  return receiveData(COMMAND_WHITE, white);
 }
 
 uint8_t
@@ -182,7 +196,7 @@ VEML7700::
 getHighThresholdEvent(uint8_t& event)
 {
   uint16_t reg;
-  uint8_t status = readData(ALS_IF_H, reg);
+  uint8_t status = receiveData(COMMAND_ALS_IF_H, reg);
   event = (reg & ALS_IF_H_MASK) >> ALS_IF_H_SHIFT;
   return status;
 }
@@ -192,7 +206,7 @@ VEML7700::
 getLowThresholdEvent(uint8_t& event)
 {
   uint16_t reg;
-  uint8_t status = readData(ALS_IF_L, reg);
+  uint8_t status = receiveData(COMMAND_ALS_IF_L, reg);
   event = (reg & ALS_IF_L_MASK) >> ALS_IF_L_SHIFT;
   return status;
 }
@@ -201,8 +215,8 @@ void
 VEML7700::
 scaleLux(uint16_t raw_counts, float& lux)
 {
-  uint8_t gain;
-  uint8_t itime;
+  als_gain_t gain;
+  als_itime_t itime;
   getGain(gain);
   getIntegrationTime(itime);
   
@@ -220,6 +234,9 @@ scaleLux(uint16_t raw_counts, float& lux)
     break;
   case ALS_GAIN_d4:
     factor1 = 0.25f;
+    break;
+  default:
+    factor1 = 1.f;
     break;
   }
 
@@ -249,7 +266,7 @@ scaleLux(uint16_t raw_counts, float& lux)
 
   lux = raw_counts * factor1 * factor2;
 
-  // apply correction from App. Note. for raw lux > 1000
+  // apply correction from App. Note for raw lux > 1000
   //   using Horner's method
   float correction_thresh = 1000.f;
   if (lux > correction_thresh){
@@ -283,16 +300,16 @@ VEML7700::
 getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
 {
   uint16_t raw_counts;
-  uint8_t gains[4] = { ALS_GAIN_d8,
-                       ALS_GAIN_d4,
-                       ALS_GAIN_x1,
-                       ALS_GAIN_x2 };
-  uint8_t itimes[6] = {ALS_INTEGRATION_25ms,
-                       ALS_INTEGRATION_50ms,
-                       ALS_INTEGRATION_100ms,
-                       ALS_INTEGRATION_200ms,
-                       ALS_INTEGRATION_400ms,
-                       ALS_INTEGRATION_800ms };
+  als_gain_t gains[4] = { ALS_GAIN_d8,
+                          ALS_GAIN_d4,
+                          ALS_GAIN_x1,
+                          ALS_GAIN_x2 };
+  als_itime_t itimes[6] = {ALS_INTEGRATION_25ms,
+                           ALS_INTEGRATION_50ms,
+                           ALS_INTEGRATION_100ms,
+                           ALS_INTEGRATION_200ms,
+                           ALS_INTEGRATION_400ms,
+                           ALS_INTEGRATION_800ms };
 
   uint16_t counts_threshold = 100;
 
@@ -310,8 +327,7 @@ getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
       if (setPower(1)){
         return STATUS_ERROR;
       }
-      // use pointer-to-member-function here??
-      if (counts_func(raw_counts)){
+      if ((this->*counts_func)(raw_counts)){
         return STATUS_ERROR;
       }
 
@@ -331,7 +347,7 @@ getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
           if (setPower(1)){
             return STATUS_ERROR;
           }
-          if (counts_func(raw_counts)){
+          if ((this->*counts_func)(raw_counts)){
             return STATUS_ERROR;
           }
         } while (itime_idx > 0);
@@ -351,12 +367,12 @@ uint8_t
 VEML7700::
 getAutoALSLux(float& lux)
 {
-  return getAutoXLux(float& lux, &VEML7700::getALS)
+  return getAutoXLux(lux, &VEML7700::getALS);
 }
 
 uint8_t
 VEML7700::
 getAutoWhiteLux(float& lux)
 {
-  return getAutoXLux(float& lux, &VEML7700::getWhite)
+  return getAutoXLux(lux, &VEML7700::getWhite);
 }
