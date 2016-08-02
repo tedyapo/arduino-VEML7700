@@ -1,31 +1,37 @@
-// VEML7700 arduino driver
+// VEML7700.h: VEML7700 Ambient light sensor arduino driver
+//
 // Copyright 2016 Theodore C. Yapo
+//
+// released under MIT License (see file)
+
+#include <Arduino.h>
+#include <Wire.h>
 
 class VEML7700
 {
 public:
-  enum { ALS_GAIN_x1 = 0x0,   // x1
-         ALS_GAIN_x2 = 0x1,   // x2
-         ALS_GAIN_d8 = 0x2,   // x 1/8
-         ALS_GAIN_d4 = 0x3 }  // x 1/4
-    als_gain_t;
-  enum { ALS_INTEGRATION_25ms = 0xc,
-         ALS_INTEGRATION_50ms = 0x8,
-         ALS_INTEGRATION_100ms = 0x0,
-         ALS_INTEGRATION_200ms = 0x1,
-         ALS_INTEGRATION_400ms = 0x2,
-         ALS_INTEGRATION_800ms = 0x3 }
-    als_itime_t;
-  enum { ALS_PRESISTENCE_1 = 0x0,
-         ALS_PRESISTENCE_2 = 0x1,
-         ALS_PRESISTENCE_4 = 0x2,
-         ALS_PRESISTENCE_8 = 0x3 }
-    als_persist_t;
-  enum { ALS_POWER_MODE_1 = 0x0,
-         ALS_POWER_MODE_2 = 0x1,
-         ALS_POWER_MODE_3 = 0x2,
-         ALS_POWER_MODE_4 = 0x3 }
-    als_powmode_t;
+  enum als_gain_t
+  { ALS_GAIN_x1 = 0x0,    // x 1
+    ALS_GAIN_x2 = 0x1,    // x 2
+    ALS_GAIN_d8 = 0x2,    // x 1/8
+    ALS_GAIN_d4 = 0x3 };  // x 1/4
+  enum als_itime_t
+  { ALS_INTEGRATION_25ms = 0xc,
+    ALS_INTEGRATION_50ms = 0x8,
+    ALS_INTEGRATION_100ms = 0x0,
+    ALS_INTEGRATION_200ms = 0x1,
+    ALS_INTEGRATION_400ms = 0x2,
+    ALS_INTEGRATION_800ms = 0x3 };
+  enum als_persist_t
+  { ALS_PERSISTENCE_1 = 0x0,
+    ALS_PERSISTENCE_2 = 0x1,
+    ALS_PERSISTENCE_4 = 0x2,
+    ALS_PERSISTENCE_8 = 0x3 };
+  enum als_powmode_t
+  { ALS_POWER_MODE_1 = 0x0,
+    ALS_POWER_MODE_2 = 0x1,
+    ALS_POWER_MODE_3 = 0x2,
+    ALS_POWER_MODE_4 = 0x3 };
   enum { STATUS_OK = 0, STATUS_ERROR = 0xff };
 
   VEML7700();
@@ -57,7 +63,7 @@ public:
 private:
   typedef uint8_t (VEML7700::*getCountsFunction)(uint16_t& counts);
   enum { I2C_ADDRESS = 0x10 };
-  enum { COMMAND_ALS_SM = 0x00, ALS_SM_MASK = 0x0c00, ALS_SM_SHIFT = 11 };
+  enum { COMMAND_ALS_SM = 0x00, ALS_SM_MASK = 0x1800, ALS_SM_SHIFT = 11 };
   enum { COMMAND_ALS_IT = 0x00, ALS_IT_MASK = 0x03c0, ALS_IT_SHIFT = 6 };
   enum { COMMAND_ALS_PERS = 0x00, ALS_PERS_MASK = 0x0030, ALS_PERS_SHIFT = 4 };
   enum { COMMAND_ALS_INT_EN = 0x00, ALS_INT_EN_MASK = 0x0002,
@@ -72,9 +78,10 @@ private:
   enum { COMMAND_ALS_IF_L = 0x06, ALS_IF_L_MASK = 0x8000, ALS_IF_L_SHIFT = 15 };
   enum { COMMAND_ALS_IF_H = 0x06, ALS_IF_H_MASK = 0x4000, ALS_IF_H_SHIFT = 14 };
 
-  uint16_t register_cache[6];
+  uint16_t register_cache[4];
 
   uint8_t sendData(uint8_t command, uint16_t data = 0);
   uint8_t receiveData(uint8_t command, uint16_t& data);
+  void scaleLux(uint16_t raw_counts, float& lux);
   uint8_t getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func);
 };
