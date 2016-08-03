@@ -10,17 +10,17 @@ see examples/read_VEML7700 for a simple example
 The code exposes a low-level set of API functions corresponding to the command set described in the datasheet and a higher-level API for ease of use
 ## High-level API
 
-    uint8_t getALSLux(float& lux);
+    uint8_t VEML7700::getALSLux(float& lux);
 samples the current ambient light value (photopic curve) using the current gain and integration time settings. Returns 0 on success, non-zero on failure.
 
-    uint8_t getWhiteLux(float& lux);
+    uint8_t VEML7700::getWhiteLux(float& lux);
 samples the current ambient light value (white-like curve) using the current gain and integration time settings. Returns 0 on success, non-zero on failure.
 
-    uint8_t getAutoALSLux(float& lux);
+    uint8_t VEML7700::getAutoALSLux(float& lux);
 samples the current ambient light value (photopic curve) using auto-ranging algorithm described in application note. Returns 0 on success, non-zero on failure.
 
-    uint8_t getAutoWhiteLux(float& lux);
+    uint8_t VEML7700::getAutoWhiteLux(float& lux);
 samples the current ambient light value (white-like curve) using auto-ranging algorithm described in application note. Returns 0 on success, non-zero on failure.
 
-    void sampleDelay();
+    void VEML7700::sampleDelay();
 delays (busy-wait) long enough to ensure a new sample is generated after the call is executed, based on current setting of integration time.
