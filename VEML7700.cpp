@@ -89,7 +89,7 @@ VEML7700::
 getGain(als_gain_t& gain)
 {
   gain = als_gain_t(
-    (register_cache[COMMAND_ALS_SM] & ~ALS_SM_MASK) >> ALS_SM_SHIFT );
+    (register_cache[COMMAND_ALS_SM] & ALS_SM_MASK) >> ALS_SM_SHIFT );
   return STATUS_OK;
 }
 
@@ -108,7 +108,7 @@ VEML7700::
 getIntegrationTime(als_itime_t& itime)
 {
   itime = als_itime_t(
-    (register_cache[COMMAND_ALS_IT] & ~ALS_IT_MASK) >> ALS_IT_SHIFT );
+    (register_cache[COMMAND_ALS_IT] & ALS_IT_MASK) >> ALS_IT_SHIFT );
   return STATUS_OK;
 }
 
@@ -160,7 +160,10 @@ setPower(uint8_t on)
   uint16_t reg = ( (register_cache[COMMAND_ALS_SD] & ~ALS_SD_MASK) | 
                    ((uint16_t(~on) << ALS_SD_SHIFT) & ALS_SD_MASK) );
   register_cache[COMMAND_ALS_SD] = reg;
-  return sendData(COMMAND_ALS_SD, reg);
+  uint8_t status = sendData(COMMAND_ALS_SD, reg);
+  if (on) {
+    delay(3); // minimu 2.5us delay per datasheet
+  }
 }
 
 uint8_t
@@ -227,13 +230,13 @@ scaleLux(uint16_t raw_counts, float& lux)
     factor1 = 1.f;
     break;
   case ALS_GAIN_x2:
-    factor1 = 2.f;
+    factor1 = 0.5f;
     break;
   case ALS_GAIN_d8:
-    factor1 = 0.125f;
+    factor1 = 8.f;
     break;
   case ALS_GAIN_d4:
-    factor1 = 0.25f;
+    factor1 = 4.f;
     break;
   default:
     factor1 = 1.f;
@@ -327,6 +330,7 @@ getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
       if (setPower(1)){
         return STATUS_ERROR;
       }
+      sampleDelay();
       if ((this->*counts_func)(raw_counts)){
         return STATUS_ERROR;
       }
@@ -347,6 +351,7 @@ getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
           if (setPower(1)){
             return STATUS_ERROR;
           }
+          sampleDelay();
           if ((this->*counts_func)(raw_counts)){
             return STATUS_ERROR;
           }
@@ -375,4 +380,39 @@ VEML7700::
 getAutoWhiteLux(float& lux)
 {
   return getAutoXLux(lux, &VEML7700::getWhite);
+}
+
+uint8_t
+VEML7700::
+sampleDelay()
+{
+  als_itime_t itime;
+  getIntegrationTime(itime);
+
+  // extend nominal delay to ensure new sample is generated
+  #define extended_delay(ms) delay(2*(ms))
+
+  switch(itime){
+  case ALS_INTEGRATION_25ms:
+    extended_delay(25);
+    break;
+  case ALS_INTEGRATION_50ms:
+    extended_delay(50);
+    break;
+  case ALS_INTEGRATION_100ms:
+    extended_delay(100);
+    break;
+  case ALS_INTEGRATION_200ms:
+    extended_delay(200);
+    break;
+  case ALS_INTEGRATION_400ms:
+    extended_delay(400);
+    break;
+  case ALS_INTEGRATION_800ms:
+    extended_delay(800);
+    break;
+  default:
+    extended_delay(100);
+    break;
+  }
 }

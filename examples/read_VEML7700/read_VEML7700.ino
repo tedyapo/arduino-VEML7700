@@ -9,8 +9,6 @@ void setup()
   als.begin();
 }
 
-
-
 void loop()
 {
   float lux;
