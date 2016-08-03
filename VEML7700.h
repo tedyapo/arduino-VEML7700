@@ -59,6 +59,7 @@ public:
   uint8_t getWhiteLux(float& lux);
   uint8_t getAutoALSLux(float& lux);
   uint8_t getAutoWhiteLux(float& lux);
+  uint8_t sampleDelay();
   
 private:
   typedef uint8_t (VEML7700::*getCountsFunction)(uint16_t& counts);
