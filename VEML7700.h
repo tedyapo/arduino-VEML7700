@@ -59,6 +59,14 @@ public:
   uint8_t getWhiteLux(float& lux);
   uint8_t getAutoALSLux(float& lux);
   uint8_t getAutoWhiteLux(float& lux);
+  uint8_t getAutoALSLux(float& lux,
+                        VEML7700::als_gain_t& auto_gain,
+                        VEML7700::als_itime_t& auto_itime,
+                        uint16_t& raw_counts);
+  uint8_t getAutoWhiteLux(float& lux,
+                          VEML7700::als_gain_t& auto_gain,
+                          VEML7700::als_itime_t& auto_itime,
+                          uint16_t& raw_counts);
   uint8_t sampleDelay();
   
 private:
@@ -84,5 +92,10 @@ private:
   uint8_t sendData(uint8_t command, uint16_t data = 0);
   uint8_t receiveData(uint8_t command, uint16_t& data);
   void scaleLux(uint16_t raw_counts, float& lux);
-  uint8_t getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func);
+  uint8_t getAutoXLux(float& lux,
+                      VEML7700::getCountsFunction counts_func,
+                      VEML7700::als_gain_t& auto_gain,
+                      VEML7700::als_itime_t& auto_itime,
+                      uint16_t& raw_counts);
+
 };
