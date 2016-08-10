@@ -164,6 +164,7 @@ setPower(uint8_t on)
   if (on) {
     delay(3); // minimu 2.5us delay per datasheet
   }
+  return status;
 }
 
 uint8_t
@@ -222,7 +223,7 @@ scaleLux(uint16_t raw_counts, float& lux)
   als_itime_t itime;
   getGain(gain);
   getIntegrationTime(itime);
-  
+
   float factor1, factor2;
 
   switch(gain & 0x3){
@@ -269,13 +270,10 @@ scaleLux(uint16_t raw_counts, float& lux)
 
   lux = raw_counts * factor1 * factor2;
 
-  // apply correction from App. Note for raw lux > 1000
+  // apply correction from App. Note for all readings
   //   using Horner's method
-  float correction_thresh = 1000.f;
-  if (lux > correction_thresh){
-    lux = lux * (1.0023f + lux * (8.1488e-5f + lux * (-9.3924e-9f + 
-                                                      lux * 6.0135e-13f)));
-  }
+  lux = lux * (1.0023f + lux * (8.1488e-5f + lux * (-9.3924e-9f + 
+                                                    lux * 6.0135e-13f)));
 }
 
 uint8_t
@@ -300,9 +298,12 @@ getWhiteLux(float& lux)
 
 uint8_t
 VEML7700::
-getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
+getAutoXLux(float& lux,
+            VEML7700::getCountsFunction counts_func,
+            VEML7700::als_gain_t& auto_gain,
+            VEML7700::als_itime_t& auto_itime,
+            uint16_t& raw_counts)
 {
-  uint16_t raw_counts;
   als_gain_t gains[4] = { ALS_GAIN_d8,
                           ALS_GAIN_d4,
                           ALS_GAIN_x1,
@@ -314,16 +315,18 @@ getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
                            ALS_INTEGRATION_400ms,
                            ALS_INTEGRATION_800ms };
 
-  uint16_t counts_threshold = 100;
+  uint16_t counts_threshold = 200;
 
+  int8_t itime_idx;
+  uint8_t gain_idx;
   if (setPower(0)){
     return STATUS_ERROR;
   }
-  for (int8_t itime_idx = 2; itime_idx < 6; itime_idx++){
+  for (itime_idx = 2; itime_idx < 6; itime_idx++){
     if (setIntegrationTime(itimes[itime_idx])){
       return STATUS_ERROR;
     }
-    for (uint8_t gain_idx = 0; gain_idx < 4; gain_idx++){
+    for (gain_idx = 0; gain_idx < 4; gain_idx++){
       if (setGain(gains[gain_idx])){
         return STATUS_ERROR;
       }
@@ -339,6 +342,8 @@ getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
         do {
           if (raw_counts < 10000){
             scaleLux(raw_counts, lux);
+            auto_gain = gains[gain_idx];
+            auto_itime = itimes[itime_idx];
             return STATUS_OK;  
           }
           if(setPower(0)){
@@ -357,6 +362,8 @@ getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
           }
         } while (itime_idx > 0);
         scaleLux(raw_counts, lux);
+        auto_gain = gains[gain_idx];
+        auto_itime = itimes[itime_idx];
         return STATUS_OK;  
       }
       if(setPower(0)){
@@ -365,6 +372,8 @@ getAutoXLux(float& lux, VEML7700::getCountsFunction counts_func)
     }
   }
   scaleLux(raw_counts, lux);
+  auto_gain = gains[gain_idx];
+  auto_itime = itimes[itime_idx];
   return STATUS_OK;
 }
 
@@ -372,14 +381,57 @@ uint8_t
 VEML7700::
 getAutoALSLux(float& lux)
 {
-  return getAutoXLux(lux, &VEML7700::getALS);
+  VEML7700::als_gain_t auto_gain;
+  VEML7700::als_itime_t auto_itime;
+  uint16_t raw_counts;
+  return getAutoXLux(lux,
+                     &VEML7700::getALS,
+                     auto_gain,
+                     auto_itime,
+                     raw_counts);
 }
 
 uint8_t
 VEML7700::
 getAutoWhiteLux(float& lux)
 {
-  return getAutoXLux(lux, &VEML7700::getWhite);
+  VEML7700::als_gain_t auto_gain;
+  VEML7700::als_itime_t auto_itime;
+  uint16_t raw_counts;
+  return getAutoXLux(lux,
+                     &VEML7700::getWhite,
+                     auto_gain,
+                     auto_itime,
+                     raw_counts);
+}
+
+
+uint8_t
+VEML7700::
+getAutoALSLux(float& lux,
+              VEML7700::als_gain_t& auto_gain,
+              VEML7700::als_itime_t& auto_itime,
+              uint16_t& raw_counts)
+{
+  return getAutoXLux(lux,
+                     &VEML7700::getALS,
+                     auto_gain,
+                     auto_itime,
+                     raw_counts);
+}
+
+uint8_t
+VEML7700::
+getAutoWhiteLux(float& lux,
+                VEML7700::als_gain_t& auto_gain,
+                VEML7700::als_itime_t& auto_itime,
+                uint16_t& raw_counts)
+{
+  return getAutoXLux(lux,
+                     &VEML7700::getWhite,
+                     auto_gain,
+                     auto_itime,
+                     raw_counts);
 }
 
 uint8_t
