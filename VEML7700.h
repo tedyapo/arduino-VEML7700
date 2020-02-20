@@ -4,6 +4,9 @@
 //
 // released under MIT License (see file)
 
+#ifndef VEML7700_H
+#define VEML7700_H
+
 #include <Arduino.h>
 #include <Wire.h>
 
@@ -99,3 +102,5 @@ private:
                       uint16_t& raw_counts);
 
 };
+
+#endif // VEML7700_H
